@@ -5,7 +5,7 @@ Chat-based web app where an AI agent conversationally collects customer info and
 ## Tech Stack
 
 - Frontend: React 18 + Vite (in `react/`)
-- Backend: Supabase Edge Functions (Deno, in `server/functions/`)
+- Backend: Supabase Edge Functions (Deno, in `server/supabase/functions/`)
 - Database: Supabase Postgres
 - LLM: Gemini 3.1 Pro via Google AI Studio API
 - Styling: Tailwind CSS v4
@@ -29,18 +29,20 @@ react/                        # Frontend app
     main.jsx
 
 server/                       # Backend
-  functions/
-    chat/index.ts             # Main agent endpoint (POST)
-    schema/index.ts           # Admin CRUD for onboarding fields
-    on-complete/index.ts      # Post-onboarding webhook
-    _shared/
-      gemini.ts               # Gemini API client wrapper
-      prompts.ts              # Dynamic system prompt builder
-      tools.ts                # Function calling tool definitions
-      validation.ts           # Field validation per type
-      supabase.ts             # DB client + types
-  migrations/
-    001_onboarding_schema.sql # All tables, indexes, RLS, seed data
+  supabase/
+    config.toml               # Supabase project config
+    functions/
+      chat/index.ts           # Main agent endpoint (POST)
+      schema/index.ts         # Admin CRUD for onboarding fields
+      on-complete/index.ts    # Post-onboarding webhook
+      _shared/
+        gemini.ts             # Gemini API client wrapper
+        prompts.ts            # Dynamic system prompt builder
+        tools.ts              # Function calling tool definitions
+        validation.ts         # Field validation per type
+        supabase.ts           # DB client + types
+    migrations/
+      001_onboarding_schema.sql # All tables, indexes, RLS, seed data
 ```
 
 ## Commands
@@ -56,7 +58,7 @@ server/                       # Backend
 
 - The `react/` and `server/` folders are fully independent. No shared code between them.
 - Edge functions are written in TypeScript for Deno runtime (use `https://esm.sh/` imports, not npm).
-- All shared server logic goes in `server/functions/_shared/`. Edge functions import from there.
+- All shared server logic goes in `server/supabase/functions/_shared/`. Edge functions import from there.
 - The frontend calls edge functions via `supabase.functions.invoke()`, never direct HTTP.
 - Every field the LLM extracts MUST be validated server-side in `validation.ts` before saving. Never trust the model.
 

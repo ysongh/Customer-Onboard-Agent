@@ -1,10 +1,10 @@
 {
-  "name": "customer-onboard-agent",
+  "name": "server",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "client": "cd react && pnpm dev"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
