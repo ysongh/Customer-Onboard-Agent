@@ -1,21 +1,38 @@
+import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet } from 'react-router-dom'
 import ChatWindow from './components/ChatWindow'
+import AdminDashboard from './components/AdminDashboard'
+import Navbar from './components/Navbar'
 
-const getSlugFromPath = (): string => {
-  const parts = window.location.pathname.split('/').filter(Boolean)
-  const onboardIndex = parts.indexOf('onboard')
-  if (onboardIndex !== -1 && parts[onboardIndex + 1]) {
-    return parts[onboardIndex + 1]
-  }
-  return 'demo'
+const OnboardPage = () => {
+  const { slug = 'demo' } = useParams()
+  return <ChatWindow businessSlug={slug} />
+}
+
+const AdminPage = () => {
+  const { slug = 'demo' } = useParams()
+  return <AdminDashboard businessSlug={slug} />
+}
+
+const Layout = () => {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <Navbar />
+      <Outlet />
+    </div>
+  )
 }
 
 const App = () => {
-  const businessSlug = getSlugFromPath()
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <ChatWindow businessSlug={businessSlug} />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/onboard/:slug" element={<OnboardPage />} />
+          <Route path="/admin/:slug" element={<AdminPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/onboard/demo" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 

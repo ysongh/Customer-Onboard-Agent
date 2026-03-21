@@ -17,6 +17,15 @@ export const initSession = async (businessSlug: string) => {
   return data
 }
 
+export const fetchCustomers = async (businessSlug: string) => {
+  const { data, error } = await supabase.functions.invoke('customers', {
+    body: { business_slug: businessSlug },
+  })
+
+  if (error) throw new Error(error.message || 'Failed to fetch customers')
+  return data
+}
+
 export const sendChatMessage = async (businessSlug: string, sessionId: string, message: string) => {
   const { data, error } = await supabase.functions.invoke('chat', {
     body: {
