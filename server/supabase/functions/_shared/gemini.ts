@@ -3,7 +3,8 @@ const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 export interface GeminiRequest {
   system_instruction: { parts: { text: string }[] };
-  contents: { role: string; parts: { text: string }[] }[];
+  // deno-lint-ignore no-explicit-any
+  contents: { role: string; parts: any[] }[];
   tools: unknown[];
   generation_config: {
     temperature: number;

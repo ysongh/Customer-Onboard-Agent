@@ -191,9 +191,57 @@ Deno.serve(async (req) => {
         .eq("id", session.id);
     }
 
+    // ── Step 8b: If Gemini returned function calls but no text, make a
+    //    lightweight follow-up call with updated state to get a reply ──
+    let assistantMessage = parsed.text;
+
+    if (!assistantMessage && parsed.functionCalls.length > 0) {
+      // Rebuild system prompt with the now-updated collected fields
+      const updatedPrompt = buildSystemPrompt(biz, schema, collectedFields);
+
+      // Summarize what just happened so the model can respond naturally
+      const savedSummary = functionCallResults
+        .filter((r) => r.status === "saved" || r.status === "corrected")
+        .map((r) => `${r.field}: ${r.value}`)
+        .join(", ");
+
+      const followUpRequest: GeminiRequest = {
+        system_instruction: { parts: [{ text: updatedPrompt }] },
+        contents: [
+          ...contents,
+          {
+            role: "model",
+            parts: [{ text: `[Saved: ${savedSummary}]` }],
+          },
+          {
+            role: "user",
+            parts: [
+              {
+                text: "Fields have been saved successfully. Now respond conversationally to the customer — acknowledge what was saved and ask for the next missing field. Do NOT call any tools.",
+              },
+            ],
+          },
+        ],
+        tools: onboardingTools,
+        generation_config: {
+          temperature: 0.3,
+          max_output_tokens: 1024,
+        },
+        tool_config: {
+          function_calling_config: { mode: "NONE" },
+        },
+      };
+
+      const followUpResponse = await callGemini(followUpRequest);
+      const followUpParsed = parseGeminiResponse(followUpResponse);
+      assistantMessage = followUpParsed.text || "Got it! Let me continue.";
+    }
+
+    if (!assistantMessage) {
+      assistantMessage = "Got it! Let me continue.";
+    }
+
     // ── Step 9: Save assistant response to conversation_log ──
-    const assistantMessage =
-      parsed.text || "I'm processing your information...";
 
     await supabase.from("conversation_log").insert({
       session_id: session.id,
