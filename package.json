@@ -1,0 +1,12 @@
+{
+  "name": "customer-onboard-agent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+   "scripts": {
+    "client": "cd react && pnpm dev",
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
