@@ -1,19 +1,57 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet } from 'react-router-dom'
+import useAuth from './hooks/useAuth'
 import ChatWindow from './components/ChatWindow'
-import AdminDashboard from './components/AdminDashboard'
 import Navbar from './components/Navbar'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
+import SetupChat from './pages/SetupChat'
+import Dashboard from './pages/Dashboard'
+import CustomerDetail from './pages/CustomerDetail'
 
 const OnboardPage = () => {
   const { slug = 'demo' } = useParams()
   return <ChatWindow businessSlug={slug} />
 }
 
-const AdminPage = () => {
-  const { slug = 'demo' } = useParams()
-  return <AdminDashboard businessSlug={slug} />
+/** Wrapper that requires authentication — redirects to /login otherwise */
+const AuthGuard = () => {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <Outlet />
 }
 
-const Layout = () => {
+/** Redirect authenticated users away from login/signup */
+const GuestGuard = () => {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+      </div>
+    )
+  }
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <Outlet />
+}
+
+const AuthLayout = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
@@ -22,15 +60,49 @@ const Layout = () => {
   )
 }
 
+const RootRedirect = () => {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+      </div>
+    )
+  }
+
+  return <Navigate to={user ? '/dashboard' : '/login'} replace />
+}
+
 const App = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<Layout />}>
-          <Route path="/onboard/:slug" element={<OnboardPage />} />
-          <Route path="/admin/:slug" element={<AdminPage />} />
+        {/* Public: customer-facing onboarding chat */}
+        <Route path="/onboard/:slug" element={
+          <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+            <OnboardPage />
+          </div>
+        } />
+
+        {/* Guest-only: login and signup */}
+        <Route element={<GuestGuard />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
         </Route>
-        <Route path="*" element={<Navigate to="/onboard/demo" replace />} />
+
+        {/* Authenticated: setup, dashboard, customer detail */}
+        <Route element={<AuthGuard />}>
+          <Route element={<AuthLayout />}>
+            <Route path="/setup" element={<SetupChat />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/:customerId" element={<CustomerDetail />} />
+          </Route>
+        </Route>
+
+        {/* Root redirect */}
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
