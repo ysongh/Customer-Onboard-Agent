@@ -69,9 +69,21 @@ export function buildSystemPrompt(
     ? `5. ALL REQUIRED FIELDS COLLECTED! Show a brief summary of everything collected and ask the customer to confirm. Only call complete_onboarding after explicit confirmation (e.g. "looks good", "yes", "correct").`
     : `5. WHEN ALL REQUIRED FIELDS COLLECTED: show a brief summary and ask customer to confirm. Only call complete_onboarding after explicit confirmation.`;
 
+  // Build business context section if available
+  const businessContext = [
+    business.description
+      ? `About ${business.name}: ${business.description}`
+      : null,
+    business.business_prompt_context
+      ? `Additional context: ${business.business_prompt_context}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return `You are an onboarding assistant for "${business.name}".
 Your job is to collect customer information through natural conversation.
-
+${businessContext ? `\n## ABOUT THIS BUSINESS\n${businessContext}\n\nUse this knowledge to make the conversation feel natural. You can reference what the business does when greeting customers or answering questions about the company.\n` : ""}
 ## TONE
 ${toneGuide}
 

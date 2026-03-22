@@ -9,6 +9,37 @@ export interface Business {
   welcome_message: string | null;
   brand_tone: "friendly" | "professional" | "casual";
   settings: Record<string, unknown>;
+  description: string | null;
+  business_prompt_context: string | null;
+  owner_id: string | null;
+  created_at: string;
+}
+
+export interface BusinessSetupSession {
+  id: string;
+  owner_id: string;
+  business_id: string | null;
+  collected_config: Record<string, unknown>;
+  state: "in_progress" | "completed" | "abandoned";
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface SetupConversationMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "model";
+  content: string;
+  function_calls: unknown[] | null;
+  sent_at: string;
+}
+
+export interface Notification {
+  id: string;
+  business_id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  read: boolean;
   created_at: string;
 }
 

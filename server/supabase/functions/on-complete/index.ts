@@ -92,6 +92,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Store notification for the business owner's dashboard
+    if (biz.owner_id) {
+      try {
+        await supabase.from("notifications").insert({
+          business_id: biz.id,
+          type: "new_customer",
+          payload: {
+            customer_id: cust.id,
+            customer_name: cust.name || "Unknown",
+            customer_email: cust.email || null,
+            message: `New customer onboarded: ${cust.name || cust.email || "Unknown"}`,
+          },
+        });
+        console.log("on-complete: notification stored for owner");
+      } catch (notifErr) {
+        console.error("on-complete: failed to store notification", notifErr);
+      }
+    }
+
     console.log(
       `on-complete: finished for customer ${cust.id} (${cust.email})`,
     );
