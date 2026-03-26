@@ -9,11 +9,10 @@ import { validateField } from "../_shared/validation.ts";
 import { onboardingTools } from "../_shared/tools.ts";
 import { buildSystemPrompt } from "../_shared/prompts.ts";
 import {
-  callGemini,
-  parseGeminiResponse,
-  type GeminiRequest,
-  type GeminiFunctionCall,
-} from "../_shared/gemini.ts";
+  callClaude,
+  parseClaudeResponse,
+  type ClaudeMessage,
+} from "../_shared/claude.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -122,30 +121,22 @@ Deno.serve(async (req) => {
       session.collected_fields,
     );
 
-    // ── Step 7: Call Gemini with system prompt + history + tools ──
-    const contents = [
+    // ── Step 7: Call Claude with system prompt + history + tools ──
+    const messages: ClaudeMessage[] = [
       ...history.map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
+        role: (m.role === "model" ? "assistant" : m.role) as "user" | "assistant",
+        content: m.content,
       })),
-      { role: "user", parts: [{ text: userMessage }] },
+      { role: "user", content: userMessage },
     ];
 
-    const geminiRequest: GeminiRequest = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      tools: onboardingTools,
-      generation_config: {
-        temperature: 0.3,
-        max_output_tokens: 1024,
-      },
-      tool_config: {
-        function_calling_config: { mode: "AUTO" },
-      },
-    };
-
-    const rawResponse = await callGemini(geminiRequest);
-    const parsed = parseGeminiResponse(rawResponse);
+    const rawResponse = await callClaude(
+      systemPrompt,
+      messages,
+      onboardingTools,
+      { temperature: 0.3, maxTokens: 1024 },
+    );
+    const parsed = parseClaudeResponse(rawResponse);
 
     // ── Step 8: Process function calls ──
     const functionCallResults: {
@@ -191,7 +182,7 @@ Deno.serve(async (req) => {
         .eq("id", session.id);
     }
 
-    // ── Step 8b: If Gemini returned function calls but no text, make a
+    // ── Step 8b: If Claude returned function calls but no text, make a
     //    lightweight follow-up call with updated state to get a reply ──
     let assistantMessage = parsed.text;
 
@@ -205,35 +196,25 @@ Deno.serve(async (req) => {
         .map((r) => `${r.field}: ${r.value}`)
         .join(", ");
 
-      const followUpRequest: GeminiRequest = {
-        system_instruction: { parts: [{ text: updatedPrompt }] },
-        contents: [
-          ...contents,
-          {
-            role: "model",
-            parts: [{ text: `[Saved: ${savedSummary}]` }],
-          },
-          {
-            role: "user",
-            parts: [
-              {
-                text: "Fields have been saved successfully. Now respond conversationally to the customer — acknowledge what was saved and ask for the next missing field. Do NOT call any tools.",
-              },
-            ],
-          },
-        ],
-        tools: onboardingTools,
-        generation_config: {
-          temperature: 0.3,
-          max_output_tokens: 1024,
+      const followUpMessages: ClaudeMessage[] = [
+        ...messages,
+        {
+          role: "assistant",
+          content: `[Saved: ${savedSummary}]`,
         },
-        tool_config: {
-          function_calling_config: { mode: "NONE" },
+        {
+          role: "user",
+          content: "Fields have been saved successfully. Now respond conversationally to the customer — acknowledge what was saved and ask for the next missing field. Do NOT call any tools.",
         },
-      };
+      ];
 
-      const followUpResponse = await callGemini(followUpRequest);
-      const followUpParsed = parseGeminiResponse(followUpResponse);
+      const followUpResponse = await callClaude(
+        updatedPrompt,
+        followUpMessages,
+        onboardingTools,
+        { temperature: 0.3, maxTokens: 1024, toolChoice: { type: "none" } },
+      );
+      const followUpParsed = parseClaudeResponse(followUpResponse);
       assistantMessage = followUpParsed.text || "Got it! Let me continue.";
     }
 
@@ -285,7 +266,7 @@ Deno.serve(async (req) => {
 // ── Process individual function calls ──
 
 async function processFunctionCall(
-  fc: GeminiFunctionCall,
+  fc: { name: string; args: Record<string, unknown> },
   schema: SchemaField[],
   session: OnboardingSession,
   business: Business,

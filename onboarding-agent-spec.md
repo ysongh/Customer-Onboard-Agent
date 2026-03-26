@@ -4,7 +4,7 @@
 
 A chat-based web app where an AI agent conversationally collects customer information (name, email, company, etc.) and creates their account. No document uploads, no KYC — just a natural conversation that replaces a boring form.
 
-**Stack:** React + Vite (frontend), Supabase Edge Functions (backend), Gemini 3.1 Pro via Google AI Studio API (LLM), Supabase Postgres (database).
+**Stack:** React + Vite (frontend), Supabase Edge Functions (backend), Claude via Anthropic SDK (LLM), Supabase Postgres (database).
 
 ---
 
@@ -40,7 +40,7 @@ onboarding-agent/
 │   │   ├── on-complete/            # Post-onboarding webhook
 │   │   │   └── index.ts
 │   │   └── _shared/                # Shared modules
-│   │       ├── gemini.ts           # Gemini API client
+│   │       ├── claude.ts           # Anthropic Claude SDK client
 │   │       ├── prompts.ts          # Dynamic system prompt builder
 │   │       ├── tools.ts            # Function calling tool definitions
 │   │       ├── validation.ts       # Field validation logic
@@ -49,7 +49,7 @@ onboarding-agent/
 │   │   └── 001_onboarding_schema.sql
 │   └── config.toml
 │
-├── .env                            # GEMINI_API_KEY
+├── .env                            # ANTHROPIC_API_KEY
 └── README.md
 ```
 
@@ -158,7 +158,7 @@ Include a "Demo Business" with slug `demo` and 6 sample fields: name (text, requ
 4. Load conversation history (last 30 messages)
 5. Save user message to conversation_log
 6. Build dynamic system prompt (see Prompt Design below)
-7. Call Gemini 3.1 Pro with system prompt + history + tools
+7. Call Claude with system prompt + history + tools
 8. Process function calls (save_field → validate → write to session; complete_onboarding → create customer record)
 9. Save assistant response to conversation_log
 10. Return response with progress
@@ -177,17 +177,16 @@ Fires asynchronously after `complete_onboarding`. Loads customer + business sett
 
 ### 4. `_shared/` modules
 
-**gemini.ts** — Thin wrapper around the Gemini API.
-- Model: `gemini-3.1-pro-preview-customtools` (prioritizes custom function calls)
+**claude.ts** — Wrapper around the Anthropic Claude SDK.
+- Model: `claude-sonnet-4-6` (fast, capable tool use)
 - Temperature: 0.3 (low — we want reliable extraction, not creativity)
-- Thinking level: "low" (fast responses, lower cost)
-- Tool config mode: "AUTO" (model decides when to call tools)
-- Base URL: `https://generativelanguage.googleapis.com/v1beta`
-- Auth: API key as query param
+- Max tokens: 1024
+- SDK: `@anthropic-ai/sdk` via `https://esm.sh/` for Deno
+- Auth: `ANTHROPIC_API_KEY` environment variable
 
 **prompts.ts** — Builds the system prompt dynamically per turn. See Prompt Design section.
 
-**tools.ts** — Gemini function calling declarations. See Tool Definitions section.
+**tools.ts** — Claude tool use declarations. See Tool Definitions section.
 
 **validation.ts** — Server-side validation for each field type:
 - email: regex check, lowercase
@@ -201,7 +200,7 @@ Fires asynchronously after `complete_onboarding`. Loads customer + business sett
 
 ---
 
-## Gemini Prompt Design
+## Claude Prompt Design
 
 The system prompt is rebuilt on EVERY turn with fresh state from the database. It has four sections:
 
@@ -277,7 +276,7 @@ Optional (ask only if natural):
 
 ---
 
-## Gemini Function Calling Tool Definitions
+## Claude Tool Use Definitions
 
 ### save_field
 - **When:** Customer provides info matching a schema field
@@ -306,7 +305,7 @@ Optional (ask only if natural):
 - **ChatMessage**: Bubble component. User messages right-aligned with accent color, assistant messages left-aligned with neutral background.
 - **ChatInput**: Text input + send button. Disabled when loading or completed.
 - **ProgressBar**: Shows "Step X of Y" with a visual progress bar. Turns green on completion.
-- **TypingIndicator**: Three-dot animation shown while waiting for Gemini response.
+- **TypingIndicator**: Three-dot animation shown while waiting for Claude response.
 
 ### UX Details
 - Auto-scroll to bottom on new messages
@@ -327,26 +326,26 @@ Keep it clean and modern. The chat should feel like a messaging app, not a corpo
 Turn 1 — Session created, 0% complete
 System prompt: all fields missing
 User: "(Customer just opened the chat)"
-Gemini: "Hey there! I'm here to get you set up. This will just take a minute.
+Claude: "Hey there! I'm here to get you set up. This will just take a minute.
          What's your name?"
 
 Turn 2 — 0% complete
 User: "I'm Alex Chen, I run a small agency called Bright Ideas"
-Gemini calls: save_field("name", "Alex Chen")
+Claude calls: save_field("name", "Alex Chen")
               save_field("company", "Bright Ideas")
-Gemini: "Nice to meet you, Alex! Bright Ideas — great name.
+Claude: "Nice to meet you, Alex! Bright Ideas — great name.
          What's the best email to reach you at?"
 
 Turn 3 — 50% complete
 User: "alex@brightideas.co"
-Gemini calls: save_field("email", "alex@brightideas.co")
-Gemini: "Got it. And roughly how big is your team — would you say
+Claude calls: save_field("email", "alex@brightideas.co")
+Claude: "Got it. And roughly how big is your team — would you say
          1-10, 11-50, or larger?"
 
 Turn 4 — 75% complete
 User: "just me and 4 others"
-Gemini calls: save_field("company_size", "1-10")
-Gemini: "Perfect, here's what I have:
+Claude calls: save_field("company_size", "1-10")
+Claude: "Perfect, here's what I have:
 
          Name: Alex Chen
          Company: Bright Ideas
@@ -357,8 +356,8 @@ Gemini: "Perfect, here's what I have:
 
 Turn 5 — 100% complete, awaiting confirmation
 User: "Looks good!"
-Gemini calls: complete_onboarding()
-Gemini: "You're all set! Your account is live. You'll get a welcome
+Claude calls: complete_onboarding()
+Claude: "You're all set! Your account is live. You'll get a welcome
          email at alex@brightideas.co shortly."
 ```
 
@@ -374,7 +373,7 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ### server (Supabase secrets)
 ```
-GEMINI_API_KEY=your_gemini_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-available in edge functions.
@@ -383,43 +382,40 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ## API Reference
 
-### Gemini API Call Shape
-```
-POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview-customtools:generateContent?key={API_KEY}
-
-{
-  "system_instruction": { "parts": [{ "text": "..." }] },
-  "contents": [
-    { "role": "user", "parts": [{ "text": "..." }] },
-    { "role": "model", "parts": [{ "text": "..." }] },
+### Claude API Call Shape (via Anthropic SDK)
+```typescript
+const response = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  temperature: 0.3,
+  system: "...",
+  messages: [
+    { role: "user", content: "..." },
+    { role: "assistant", content: "..." },
     ...
   ],
-  "tools": [{
-    "functionDeclarations": [ ...tool definitions... ]
-  }],
-  "generation_config": {
-    "temperature": 0.3,
-    "max_output_tokens": 1024,
-    "thinking_level": "low"
-  },
-  "tool_config": {
-    "function_calling_config": { "mode": "AUTO" }
-  }
-}
+  tools: [
+    {
+      name: "save_field",
+      description: "...",
+      input_schema: {
+        type: "object",
+        properties: { ... },
+        required: [...]
+      }
+    }
+  ]
+});
 ```
 
-### Gemini Response Shape
+### Claude Response Shape
 ```json
 {
-  "candidates": [{
-    "content": {
-      "parts": [
-        { "text": "Nice to meet you!" },
-        { "functionCall": { "name": "save_field", "args": { "field_name": "name", "value": "Alex" } } }
-      ]
-    }
-  }]
+  "content": [
+    { "type": "text", "text": "Nice to meet you!" },
+    { "type": "tool_use", "id": "toolu_...", "name": "save_field", "input": { "field_name": "name", "value": "Alex" } }
+  ]
 }
 ```
 
-Parts can contain both text and functionCall entries. Process ALL parts — there can be multiple function calls in a single response.
+Content blocks can contain both text and tool_use entries. Process ALL blocks — there can be multiple tool calls in a single response.

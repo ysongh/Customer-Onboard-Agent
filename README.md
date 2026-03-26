@@ -15,7 +15,7 @@ An AI-powered chat agent that replaces traditional onboarding forms with natural
 - **Frontend:** React 18 + Vite + Tailwind CSS v4
 - **Backend:** Supabase Edge Functions (Deno/TypeScript)
 - **Database:** Supabase Postgres
-- **LLM:** Gemini 3.1 Pro (function calling for structured data extraction)
+- **LLM:** Claude via Anthropic SDK (tool use for structured data extraction)
 
 ## Project Structure
 
@@ -32,7 +32,7 @@ server/                         # Backend
       chat/index.ts             # Main agent endpoint
       schema/index.ts           # Admin CRUD for onboarding fields
       on-complete/index.ts      # Post-onboarding webhook
-      _shared/                  # Shared server logic (Gemini client, prompts, validation)
+      _shared/                  # Shared server logic (Claude client, prompts, validation)
     migrations/                 # Database schema + seed data
 ```
 
@@ -43,7 +43,7 @@ server/                         # Backend
 - [Node.js](https://nodejs.org/) (v18+)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 - A [Supabase](https://supabase.com/) project
-- A [Google AI Studio](https://aistudio.google.com/) API key (Gemini)
+- An [Anthropic](https://console.anthropic.com/) API key (Claude)
 
 ### 1. Clone and install
 
@@ -62,11 +62,11 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
 
-Set the Gemini API key as a Supabase secret:
+Set the Anthropic API key as a Supabase secret:
 
 ```bash
 cd server
-supabase secrets set GEMINI_API_KEY=your_gemini_api_key
+supabase secrets set ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 ### 3. Set up the database

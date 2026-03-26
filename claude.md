@@ -7,7 +7,7 @@ Chat-based web app where an AI agent conversationally collects customer info and
 - Frontend: React 18 + Vite (in `react/`)
 - Backend: Supabase Edge Functions (Deno, in `server/supabase/functions/`)
 - Database: Supabase Postgres
-- LLM: Gemini 3.1 Pro via Google AI Studio API
+- LLM: Claude (Anthropic SDK)
 - Styling: Tailwind CSS v4
 
 ## Project Structure
@@ -36,7 +36,7 @@ server/                       # Backend
       schema/index.ts         # Admin CRUD for onboarding fields
       on-complete/index.ts    # Post-onboarding webhook
       _shared/
-        gemini.ts             # Gemini API client wrapper
+        claude.ts             # Anthropic Claude SDK client wrapper
         prompts.ts            # Dynamic system prompt builder
         tools.ts              # Function calling tool definitions
         validation.ts         # Field validation per type
@@ -73,18 +73,17 @@ Key design decisions:
 - Row Level Security: admins manage their business data, anonymous users can create sessions and chat.
 - Include seed data: a "Demo Business" with slug `demo` and 6 sample fields (name, email, company, role, company_size, phone).
 
-## Gemini API Integration
+## Claude API Integration
 
-- Model: `gemini-3.1-pro-preview-customtools` (prioritizes custom function calls over defaults)
-- Base URL: `https://generativelanguage.googleapis.com/v1beta`
-- Auth: API key as query param `?key={GEMINI_API_KEY}`
+- Model: `claude-sonnet-4-6` (latest Sonnet — fast, capable tool use)
+- SDK: `@anthropic-ai/sdk` via `https://esm.sh/` for Deno
+- Auth: `ANTHROPIC_API_KEY` environment variable
 - Temperature: 0.3 (low — reliable extraction over creativity)
-- Thinking level: "low" (fast + cheap)
-- Tool config mode: "AUTO"
+- Max tokens: 1024
 
-### Function Calling Tools
+### Tool Use
 
-3 tools defined for Gemini:
+3 tools defined for Claude:
 
 1. **save_field** — Save an extracted field value. Can be called multiple times per response. Params: `field_name` (must match schema), `value` (cleaned).
 2. **complete_onboarding** — Create customer account. Only after all required fields collected AND customer confirms. Params: `notes` (optional).
@@ -114,7 +113,7 @@ The `chat/index.ts` function follows these 10 steps on every request:
 4. Load conversation history (last 30 messages)
 5. Save user message to conversation_log
 6. Build dynamic system prompt via `prompts.ts`
-7. Call Gemini with system prompt + history + tools
+7. Call Claude with system prompt + history + tools
 8. Process function calls (validate + save fields, or create customer)
 9. Save assistant response to conversation_log
 10. Return response with session_id, message, progress, and completion status
@@ -144,7 +143,7 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ### Supabase secrets (server)
 ```
-GEMINI_API_KEY=your_gemini_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-available in edge functions.
@@ -184,9 +183,9 @@ GEMINI_API_KEY=your_gemini_api_key
 ## Important Notes
 
 - NEVER commit `.env` files
-- The Gemini API key must be set as a Supabase secret, not hardcoded
-- Always validate fields server-side even though Gemini also validates
+- The Anthropic API key must be set as a Supabase secret, not hardcoded
+- Always validate fields server-side even though Claude also validates
 - The `complete_onboarding` function must double-check all required fields exist before creating a customer — don't trust the model's judgment alone
 - Edge functions must return CORS headers including for OPTIONS preflight requests
-- Conversation history sent to Gemini is limited to last 30 messages to stay within context limits
+- Conversation history sent to Claude is limited to last 30 messages to stay within context limits
 - Reference the spec document at `onboarding-agent-spec.md` for complete API shapes, example conversation traces, and detailed prompt text

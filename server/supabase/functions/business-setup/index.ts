@@ -7,11 +7,10 @@ import {
 import { setupTools } from "../_shared/setup-tools.ts";
 import { buildSetupSystemPrompt } from "../_shared/setup-prompts.ts";
 import {
-  callGemini,
-  parseGeminiResponse,
-  type GeminiRequest,
-  type GeminiFunctionCall,
-} from "../_shared/gemini.ts";
+  callClaude,
+  parseClaudeResponse,
+  type ClaudeMessage,
+} from "../_shared/claude.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -113,30 +112,22 @@ Deno.serve(async (req) => {
     // ── Build system prompt ──
     const systemPrompt = buildSetupSystemPrompt(session);
 
-    // ── Call Gemini ──
-    const contents = [
+    // ── Call Claude ──
+    const messages: ClaudeMessage[] = [
       ...history.map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
+        role: (m.role === "model" ? "assistant" : m.role) as "user" | "assistant",
+        content: m.content,
       })),
-      { role: "user", parts: [{ text: userMessage }] },
+      { role: "user", content: userMessage },
     ];
 
-    const geminiRequest: GeminiRequest = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      tools: setupTools,
-      generation_config: {
-        temperature: 0.3,
-        max_output_tokens: 1024,
-      },
-      tool_config: {
-        function_calling_config: { mode: "AUTO" },
-      },
-    };
-
-    const rawResponse = await callGemini(geminiRequest);
-    const parsed = parseGeminiResponse(rawResponse);
+    const rawResponse = await callClaude(
+      systemPrompt,
+      messages,
+      setupTools,
+      { temperature: 0.3, maxTokens: 1024 },
+    );
+    const parsed = parseClaudeResponse(rawResponse);
 
     // ── Process function calls ──
     const functionCallResults: {
@@ -192,35 +183,25 @@ Deno.serve(async (req) => {
         .map((r) => r.name)
         .join(", ");
 
-      const followUpRequest: GeminiRequest = {
-        system_instruction: { parts: [{ text: updatedPrompt }] },
-        contents: [
-          ...contents,
-          {
-            role: "model",
-            parts: [{ text: `[Called: ${savedSummary}]` }],
-          },
-          {
-            role: "user",
-            parts: [
-              {
-                text: "Configuration has been saved successfully. Now respond conversationally — acknowledge what was saved and guide the owner to the next step. Do NOT call any tools.",
-              },
-            ],
-          },
-        ],
-        tools: setupTools,
-        generation_config: {
-          temperature: 0.3,
-          max_output_tokens: 1024,
+      const followUpMessages: ClaudeMessage[] = [
+        ...messages,
+        {
+          role: "assistant",
+          content: `[Called: ${savedSummary}]`,
         },
-        tool_config: {
-          function_calling_config: { mode: "NONE" },
+        {
+          role: "user",
+          content: "Configuration has been saved successfully. Now respond conversationally — acknowledge what was saved and guide the owner to the next step. Do NOT call any tools.",
         },
-      };
+      ];
 
-      const followUpResponse = await callGemini(followUpRequest);
-      const followUpParsed = parseGeminiResponse(followUpResponse);
+      const followUpResponse = await callClaude(
+        updatedPrompt,
+        followUpMessages,
+        setupTools,
+        { temperature: 0.3, maxTokens: 1024, toolChoice: { type: "none" } },
+      );
+      const followUpParsed = parseClaudeResponse(followUpResponse);
       assistantMessage = followUpParsed.text || "Got it! Let me continue setting things up.";
     }
 
@@ -263,7 +244,7 @@ Deno.serve(async (req) => {
 // ── Process setup function calls ──
 
 async function processSetupFunctionCall(
-  fc: GeminiFunctionCall,
+  fc: { name: string; args: Record<string, unknown> },
   config: Record<string, unknown>,
   ownerId: string,
   session: BusinessSetupSession,
