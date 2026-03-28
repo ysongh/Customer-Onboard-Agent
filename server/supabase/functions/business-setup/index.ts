@@ -1,4 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   supabase,
   type BusinessSetupSession,
@@ -31,18 +30,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Authentication required." }, 401);
     }
 
-    // Create a user-scoped client to verify the JWT
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ||
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
+    // Verify the JWT using the service-role client
+    const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: authError,
-    } = await userClient.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
       return jsonResponse({ error: "Invalid or expired token." }, 401);
@@ -483,7 +476,6 @@ async function processSetupFunctionCall(
         .update({ business_id: business.id })
         .eq("id", session.id);
 
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
       // The shareable link uses the frontend URL pattern
       const shareableLink = `/onboard/${config.slug}`;
 
