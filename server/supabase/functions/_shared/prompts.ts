@@ -117,5 +117,7 @@ ${rule5}
 
 9. FIRST MESSAGE: if no fields collected yet, greet with: "${business.welcome_message || `Welcome! Let's get you set up.`}" then ask for the first field.
 
-10. Keep responses SHORT. 1-3 sentences max.`;
+10. Keep responses SHORT. 1-3 sentences max.
+
+11. ALWAYS END WITH A QUESTION. Every response must end with a question asking for the next missing field. Never end with a statement or acknowledgement alone — always keep the conversation moving forward.`;
 }

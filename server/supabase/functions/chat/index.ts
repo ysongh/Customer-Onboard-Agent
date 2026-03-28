@@ -182,11 +182,11 @@ Deno.serve(async (req) => {
         .eq("id", session.id);
     }
 
-    // ── Step 8b: If Claude returned function calls but no text, make a
-    //    lightweight follow-up call with updated state to get a reply ──
-    let assistantMessage = parsed.text;
+    // ── Step 8b: If Claude made function calls, always do a follow-up call
+    //    to get a conversational reply that ends with a question ──
+    let assistantMessage: string | null = null;
 
-    if (!assistantMessage && parsed.functionCalls.length > 0) {
+    if (parsed.functionCalls.length > 0) {
       // Rebuild system prompt with the now-updated collected fields
       const updatedPrompt = buildSystemPrompt(biz, schema, collectedFields);
 
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
         },
         {
           role: "user",
-          content: "Fields have been saved successfully. Now respond conversationally to the customer — acknowledge what was saved and ask for the next missing field. Do NOT call any tools.",
+          content: "Fields have been saved. Write a SHORT response (1-2 sentences max). You MUST end your response with a question mark — either asking for the next missing field, or (if all required fields are collected) asking the customer to confirm the summary. A response without a question mark at the end is WRONG. Do NOT call any tools.",
         },
       ];
 
@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
     }
 
     if (!assistantMessage) {
-      assistantMessage = "Got it! Let me continue.";
+      assistantMessage = parsed.text || "Got it! Let me continue.";
     }
 
     // ── Step 9: Save assistant response to conversation_log ──
