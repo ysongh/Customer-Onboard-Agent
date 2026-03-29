@@ -64,10 +64,16 @@ export function buildSystemPrompt(
 
   const allRequiredCollected = requiredDone === requiredTotal;
 
+  const missingOptionalCount = optionalFields.filter(
+    (f) => collectedFields[f.field_name] === undefined,
+  ).length;
+
   // Rule #5 changes based on whether all required fields are collected
   const rule5 = allRequiredCollected
-    ? `5. ALL REQUIRED FIELDS COLLECTED! Show a brief summary of everything collected and ask the customer to confirm. Only call complete_onboarding after explicit confirmation (e.g. "looks good", "yes", "correct").`
-    : `5. WHEN ALL REQUIRED FIELDS COLLECTED: show a brief summary and ask customer to confirm. Only call complete_onboarding after explicit confirmation.`;
+    ? missingOptionalCount > 0
+      ? `5. ALL REQUIRED FIELDS COLLECTED! Before showing the summary, ask for each remaining optional field one at a time. Only after all optional fields are asked (or skipped by the customer), show a brief summary and ask the customer to confirm.`
+      : `5. ALL REQUIRED AND OPTIONAL FIELDS COLLECTED! Show a brief summary of everything collected and ask the customer to confirm. Only call complete_onboarding after explicit confirmation (e.g. "looks good", "yes", "correct").`
+    : `5. WHEN ALL REQUIRED FIELDS COLLECTED: first ask any remaining optional fields, then show a summary and ask customer to confirm. Only call complete_onboarding after explicit confirmation.`;
 
   // Build business context section if available
   const businessContext = [
